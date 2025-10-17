@@ -111,6 +111,7 @@ if __name__ == "__main__":
                 if press and (pot.counter == 1 or remote_start):
                     dado.set_telas(dado.TELA_EXECUCAO)
                     lcd.lcd_clear()
+                    lcd.lcd_display_string("**** AGUARDE  **** ", 1, 1)
                     time.sleep(0.3)
                     pid.set_control_flag(True)
                 elif press and pot.counter == 2:
@@ -120,7 +121,7 @@ if __name__ == "__main__":
                     time.sleep(0.3)
 
             elif dado.telas == dado.TELA_EXECUCAO:
-                lcd.lcd_display_string("Execucao", 1, 1)
+                lcd.lcd_display_string("Execucao            ", 1, 1)
                 lcd.lcd_display_string(f"1:{fmt_temp(pid.value_temp[0])} 4:{fmt_temp(pid.value_temp[3])}", 2, 1)
                 lcd.lcd_display_string(f"2:{fmt_temp(pid.value_temp[1])} 5:{fmt_temp(pid.value_temp[4])}", 3, 1)
                 lcd.lcd_display_string(f"3:{fmt_temp(pid.value_temp[2])} 6:{fmt_temp(pid.value_temp[5])}", 4, 1)
@@ -139,9 +140,11 @@ if __name__ == "__main__":
                             io.io_rpi.aciona_maquina_pronta(False)
                         except Exception:
                             pass
-                    dado.set_telas(dado.TELA_INICIAL)
-                    pid.set_control_flag(False)
                     lcd.lcd_clear()
+                    lcd.lcd_display_string("**** AGUARDE  **** ", 1, 1)
+                    dado.set_telas(dado.TELA_INICIAL)
+                    pot.counter = 1
+                    pid.set_control_flag(False)
                     time.sleep(0.3)
 
             elif dado.telas == dado.TELA_CONFIGURACAO:
@@ -172,6 +175,7 @@ if __name__ == "__main__":
                     lcd.lcd_display_string(">", 4, 0)
                     if press:
                         dado.set_telas(dado.TELA_INICIAL)
+                        pot.counter = 1
                         lcd.lcd_clear()
                         time.sleep(0.3)
 
