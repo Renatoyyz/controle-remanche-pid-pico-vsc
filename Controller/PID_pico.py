@@ -1,6 +1,6 @@
 import _thread
 import time
-from IOs_pico import IO_MODBUS
+from Controller.IOs_pico import IO_MODBUS
 
 class PIDController:
     def __init__(self, kp_list=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], ki_list=[0.5, 0.5, 0.5, 0.5, 0.5, 0.5], 
@@ -23,6 +23,7 @@ class PIDController:
         self._running = False
         self._control_flag = False
         self._thread_id = None
+        self._use_thread = False  # Flag para indicar se está usando thread
         
         # Limites para anti-windup
         self.output_min = 0
@@ -116,21 +117,33 @@ class PIDController:
         """Inicia o controle PID em uma thread separada"""
         if not self._running:
             self._running = True
+            self.interval = interval
             try:
-                # No MicroPython do Pi Pico, usamos _thread.start_new_thread
+                # Tenta usar o segundo core, se falhar usa modo sem thread
                 self._thread_id = _thread.start_new_thread(self._run, (interval,))
-                print("Thread PID iniciada")
+                print("Thread PID iniciada no core1")
+                self._use_thread = True
             except Exception as e:
-                print(f"Erro ao iniciar thread PID: {e}")
-                self._running = False
+                print(f"Aviso thread PID: {e}")
+                print("Executando PID no core principal (sem thread separada)")
+                self._use_thread = False
+                # Em vez de thread, usamos timer ou execução manual
+                
+    def control_step(self):
+        """Executa um passo do controle PID (para uso sem thread)"""
+        if not self._use_thread and self._running:
+            self.control_pwm()
 
     def stop(self):
         """Para o controle PID"""
         if self._running:
             self._running = False
-            print("Thread PID parando...")
-            # No MicroPython não temos join(), então apenas marcamos para parar
-            time.sleep_ms(100)  # Pequena pausa para a thread terminar
+            if hasattr(self, '_use_thread') and self._use_thread:
+                print("Thread PID parando...")
+                # No MicroPython não temos join(), então apenas marcamos para parar
+                time.sleep_ms(100)  # Pequena pausa para a thread terminar
+            else:
+                print("PID parando (modo sem thread)")
 
     def _run(self, interval):
         """Função principal da thread PID"""

@@ -6,6 +6,57 @@ I2C_ID = 0  # I2C0 do Pi Pico
 SDA_PIN = 8  # GPIO 8
 SCL_PIN = 9  # GPIO 9
 
+class FakeLcd:
+    """Classe LCD simulada para testes sem hardware"""
+    def __init__(self, sda_pin=SDA_PIN, scl_pin=SCL_PIN, i2c_id=I2C_ID):
+        print(f"🖥️  FakeLCD inicializado (simulação)")
+        print(f"   Configurado para I2C{i2c_id}: SDA=GP{sda_pin}, SCL=GP{scl_pin}")
+        self.display_buffer = [""] * 4  # Buffer simulado de 4 linhas
+        
+    def find_i2c_address(self):
+        """Simula escaneamento I2C"""
+        return []
+        
+    def lcd_display_string(self, string, line=1, pos=0):
+        """Simula exibição no LCD"""
+        try:
+            if 1 <= line <= 4:
+                # Garante que string é realmente uma string
+                if string is None:
+                    str_content = ""
+                elif isinstance(string, (int, float)):
+                    str_content = str(string)
+                elif hasattr(string, '__str__'):
+                    str_content = str(string)
+                else:
+                    str_content = repr(string)
+                
+                # Implementa ljust manualmente para compatibilidade com MicroPython
+                if len(str_content) >= 20:
+                    display_line = str_content[:20]
+                else:
+                    spaces_needed = 20 - len(str_content)
+                    display_line = str_content + (" " * spaces_needed)
+                
+                self.display_buffer[line-1] = display_line
+                print(f"LCD L{line}: {display_line}")
+        except Exception as e:
+            print(f"❌ Erro FakeLCD: {e} - Tipo: {type(string)} - Valor: {repr(string)}")
+    
+    def lcd_clear(self):
+        """Simula limpeza do LCD"""
+        self.display_buffer = [""] * 4
+        print("🖥️  LCD: Tela limpa")
+    
+    def backlight(self, state):
+        """Simula controle do backlight"""
+        print(f"🖥️  LCD: Backlight {'ON' if state else 'OFF'}")
+    
+    def lcd_display_string_inverter(self, string, line=1, pos=0):
+        """Simula string invertida"""
+        str_content = str(string) if string is not None else ""
+        print(f"🖥️  LCD L{line} (INVERTIDO): {str_content}")
+
 class i2c_device:
     def __init__(self, addr, i2c_bus):
         self.addr = addr
@@ -104,12 +155,28 @@ Rw = 0b00000010  # Read/Write bit
 Rs = 0b00000001  # Register select bit
 
 class Lcd:
-    def __init__(self, sda_pin=SDA_PIN, scl_pin=SCL_PIN, i2c_id=I2C_ID):
+    def __init__(self, sda_pin=SDA_PIN, scl_pin=SCL_PIN, i2c_id=I2C_ID, fake_mode=False):
+        """
+        Inicializa LCD real ou simulado
+        
+        Args:
+            fake_mode (bool): Se True, usa LCD simulado para testes sem hardware
+        """
+        if fake_mode:
+            print("🖥️  Modo simulado ativado - usando FakeLCD")
+            self.fake_lcd = FakeLcd(sda_pin, scl_pin, i2c_id)
+            self.is_fake = True
+            return
+            
+        self.is_fake = False
         self.i2c_bus = I2C(i2c_id, sda=Pin(sda_pin), scl=Pin(scl_pin), freq=100000)
         self.addresses = self.find_i2c_address()
         
         if not self.addresses:
-            raise Exception(f"LCD não encontrado. Endereços disponíveis: {self.addresses}")
+            print("⚠️  Nenhum dispositivo I2C encontrado. Ativando modo simulado...")
+            self.fake_lcd = FakeLcd(sda_pin, scl_pin, i2c_id)
+            self.is_fake = True
+            return
         
         # Usa o primeiro endereço encontrado
         self.lcd_device = i2c_device(self.addresses[0], self.i2c_bus)
@@ -153,6 +220,8 @@ class Lcd:
 
     def lcd_strobe(self, data):
         """Pulso no pino Enable para validar comando"""
+        if self.is_fake:
+            return
         try:
             self.lcd_device.write_cmd(data | En | LCD_BACKLIGHT)
             time.sleep_us(500)
@@ -163,6 +232,8 @@ class Lcd:
 
     def lcd_write_four_bits(self, data):
         """Escreve 4 bits para o LCD"""
+        if self.is_fake:
+            return
         try:
             self.lcd_device.write_cmd(data | LCD_BACKLIGHT)
             self.lcd_strobe(data)
@@ -171,6 +242,8 @@ class Lcd:
 
     def lcd_write(self, cmd, mode=0):
         """Escreve um comando para o LCD"""
+        if self.is_fake:
+            return
         try:
             self.lcd_write_four_bits(mode | (cmd & 0xF0))
             self.lcd_write_four_bits(mode | ((cmd << 4) & 0xF0))
@@ -179,6 +252,8 @@ class Lcd:
 
     def lcd_write_char(self, charvalue, mode=1):
         """Escreve um caractere para o LCD"""
+        if self.is_fake:
+            return
         try:
             self.lcd_write_four_bits(mode | (charvalue & 0xF0))
             self.lcd_write_four_bits(mode | ((charvalue << 4) & 0xF0))
@@ -187,6 +262,10 @@ class Lcd:
 
     def lcd_display_string(self, string, line=1, pos=0):
         """Exibe uma string na posição especificada"""
+        if self.is_fake:
+            self.fake_lcd.lcd_display_string(string, line, pos)
+            return
+            
         try:
             if line == 1:
                 pos_new = pos
@@ -208,6 +287,10 @@ class Lcd:
 
     def lcd_clear(self):
         """Limpa o LCD e volta para home"""
+        if self.is_fake:
+            self.fake_lcd.lcd_clear()
+            return
+            
         try:
             self.lcd_write(LCD_CLEARDISPLAY)
             self.lcd_write(LCD_RETURNHOME)
@@ -217,6 +300,10 @@ class Lcd:
 
     def backlight(self, state):
         """Controla o backlight: 1 = ligado, 0 = desligado"""
+        if self.is_fake:
+            self.fake_lcd.backlight(state)
+            return
+            
         try:
             if state == 1:
                 self.lcd_device.write_cmd(LCD_BACKLIGHT)
@@ -227,6 +314,10 @@ class Lcd:
 
     def lcd_load_custom_chars(self, fontdata):
         """Carrega caracteres customizados (0-7)"""
+        if self.is_fake:
+            print("🖥️  LCD: Caracteres customizados carregados (simulado)")
+            return
+            
         try:
             self.lcd_write(0x40)
             for char in fontdata:
@@ -237,6 +328,10 @@ class Lcd:
 
     def lcd_display_string_inverter(self, string, line=1, pos=0):
         """Exibe string com fundo invertido (simulado)"""
+        if self.is_fake:
+            self.fake_lcd.lcd_display_string_inverter(string, line, pos)
+            return
+            
         try:
             if line == 1:
                 pos_new = pos
@@ -265,8 +360,12 @@ if __name__ == "__main__":
     print("Testando LCD no Pi Pico 2...")
     
     try:
-        # Cria instância do LCD
-        lcd = Lcd()
+        # Testa primeiro modo real, depois simulado se falhar
+        try:
+            lcd = Lcd(fake_mode=False)
+        except:
+            print("Falha no LCD real, usando modo simulado...")
+            lcd = Lcd(fake_mode=True)
 
         # Exibe informações iniciais
         lcd.lcd_display_string("Pi Pico 2 LCD Test", 1, 1)
@@ -279,7 +378,7 @@ if __name__ == "__main__":
         # Loop principal
         try:
             counter = 0
-            while True:
+            while counter < 5:  # Limita a 5 iterações para teste
                 # Mostra data/hora simulada
                 lcd.lcd_display_string(f"Count: {counter:06d}", 4, 1)
                 counter += 1

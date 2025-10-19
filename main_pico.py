@@ -148,9 +148,18 @@ def main():
 
                 elif dado.telas == dado.TELA_EXECUCAO:
                     lcd.lcd_display_string("Execucao          ", 1, 1)
-                    lcd.lcd_display_string(f"1:{pid.value_temp[0]:.1f} 4:{pid.value_temp[3]:.1f}", 2, 1)
-                    lcd.lcd_display_string(f"2:{pid.value_temp[1]:.1f} 5:{pid.value_temp[4]:.1f}", 3, 1)
-                    lcd.lcd_display_string(f"3:{pid.value_temp[2]:.1f} 6:{pid.value_temp[5]:.1f}", 4, 1)
+                    
+                    # Formata temperaturas de forma segura
+                    temp1 = float(pid.value_temp[0]) if pid.value_temp[0] is not None else 0.0
+                    temp2 = float(pid.value_temp[1]) if pid.value_temp[1] is not None else 0.0
+                    temp3 = float(pid.value_temp[2]) if pid.value_temp[2] is not None else 0.0
+                    temp4 = float(pid.value_temp[3]) if pid.value_temp[3] is not None else 0.0
+                    temp5 = float(pid.value_temp[4]) if pid.value_temp[4] is not None else 0.0
+                    temp6 = float(pid.value_temp[5]) if pid.value_temp[5] is not None else 0.0
+                    
+                    lcd.lcd_display_string("1:{:.1f} 4:{:.1f}".format(temp1, temp4), 2, 1)
+                    lcd.lcd_display_string("2:{:.1f} 5:{:.1f}".format(temp2, temp5), 3, 1)
+                    lcd.lcd_display_string("3:{:.1f} 6:{:.1f}".format(temp3, temp6), 4, 1)
 
                     if pot.get_sw_status == 0 or io.io_rpi.get_aciona_maquina == 1:
                         lcd.lcd_clear()
@@ -198,8 +207,8 @@ def main():
                 elif dado.telas == TELA_CONFIGURACAO_TEMP:
                     pot.set_limits(1, 6)  # Limita a quantidade de canais para ajuste de setpoint
                     canal = pot.get_counter()
-                    lcd.lcd_display_string(f"Canal {canal}", 1, 1)
-                    lcd.lcd_display_string(f"Temp: {setpoint_list[canal-1]}C", 2, 1)
+                    lcd.lcd_display_string("Canal {}".format(canal), 1, 1)
+                    lcd.lcd_display_string("Temp: {}C".format(setpoint_list[canal-1]), 2, 1)
                     lcd.lcd_display_string("Pressione para ajustar", 3, 1)
 
                     if pot.get_sw_status == 0:
@@ -210,7 +219,7 @@ def main():
                         
                         while ajt == 1:
                             setpoint_list[canal-1] = pot.get_counter()
-                            lcd.lcd_display_string(f"Temp: {setpoint_list[canal-1]}C", 2, 1)
+                            lcd.lcd_display_string("Temp: {}C".format(setpoint_list[canal-1]), 2, 1)
                             
                             if pot.get_sw_status == 0:
                                 save_setpoint_to_file(setpoint_list)  # Salva os setpoints ajustados
@@ -227,7 +236,7 @@ def main():
                     pot.set_limits(1, 6)  # Limita a quantidade de canais para ajuste de PID
                     canal = pot.get_counter()
                     lcd.lcd_display_string("Ajuste PID", 1, 1)
-                    lcd.lcd_display_string(f"Canal {canal}", 2, 1)
+                    lcd.lcd_display_string("Canal {}".format(canal), 2, 1)
                     lcd.lcd_display_string("Kp:{:.2f} Ki:{:.2f}".format(kp_list[canal-1], ki_list[canal-1]), 3, 1)
                     lcd.lcd_display_string("Kd:{:.2f}".format(kd_list[canal-1]), 4, 1)
 
@@ -241,7 +250,7 @@ def main():
                         while ajt == 1:
                             lcd.lcd_display_string("Ajuste Kp", 1, 1)
                             kp_list[canal-1] = pot.get_counter() / 100.0
-                            lcd.lcd_display_string(f"Kp: {kp_list[canal-1]:.2f}", 2, 1)
+                            lcd.lcd_display_string("Kp: {:.2f}".format(kp_list[canal-1]), 2, 1)
                             
                             if pot.get_sw_status == 0:
                                 time.sleep_ms(600)
@@ -252,7 +261,7 @@ def main():
                                 while ajt == 2:
                                     lcd.lcd_display_string("Ajuste Ki", 1, 1)
                                     ki_list[canal-1] = pot.get_counter() / 100.0
-                                    lcd.lcd_display_string(f"Ki: {ki_list[canal-1]:.2f}", 2, 1)
+                                    lcd.lcd_display_string("Ki: {:.2f}".format(ki_list[canal-1]), 2, 1)
                                     
                                     if pot.get_sw_status == 0:
                                         time.sleep_ms(600)
@@ -263,7 +272,7 @@ def main():
                                         while ajt == 3:
                                             lcd.lcd_display_string("Ajuste Kd", 1, 1)
                                             kd_list[canal-1] = pot.get_counter() / 100.0
-                                            lcd.lcd_display_string(f"Kd: {kd_list[canal-1]:.2f}", 2, 1)
+                                            lcd.lcd_display_string("Kd: {:.2f}".format(kd_list[canal-1]), 2, 1)
                                             
                                             if pot.get_sw_status == 0:
                                                 ajt = 0

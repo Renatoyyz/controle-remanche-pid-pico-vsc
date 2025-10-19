@@ -46,7 +46,13 @@ class InOut:
 
         # Inicia thread PWM usando _thread (limitado a 2 cores no Pi Pico 2)
         self.pwm_lock = _thread.allocate_lock()
-        _thread.start_new_thread(self._pwm_control_all, ())
+        try:
+            _thread.start_new_thread(self._pwm_control_all, ())
+            print("Thread PWM iniciada no core1")
+        except Exception as e:
+            print(f"Aviso PWM thread: {e}")
+            print("PWM funcionará em modo síncrono")
+            self.pwm_thread_running = False
 
     @property
     def get_aciona_maquina(self):
@@ -58,21 +64,26 @@ class InOut:
     def _pwm_control_all(self):
         """Controla PWM de todos os pinos em uma única thread para economizar recursos"""
         while self.pwm_thread_running:
-            with self.pwm_lock:
-                for pin_num, duty_cycle in self.pwm_duty_cycles.items():
-                    pin_obj = self.pwm_pins[pin_num]
-                    if duty_cycle > 0:
-                        on_time = self.pwm_period * (duty_cycle / 100.0)
-                        off_time = self.pwm_period - on_time
-                        
-                        if on_time > 0:
-                            pin_obj.off()  # LOW = ativo
-                            time.sleep_ms(int(on_time * 1000))
-                        if off_time > 0:
-                            pin_obj.on()   # HIGH = inativo
-                            time.sleep_ms(int(off_time * 1000))
-                    else:
-                        pin_obj.on()  # Mantém HIGH quando duty cycle = 0
+            self._pwm_step()
+            time.sleep_ms(100)  # 100ms entre ciclos PWM
+
+    def _pwm_step(self):
+        """Executa um ciclo PWM (pode ser chamado com ou sem thread)"""
+        with self.pwm_lock:
+            for pin_num, duty_cycle in self.pwm_duty_cycles.items():
+                pin_obj = self.pwm_pins[pin_num]
+                if duty_cycle > 0:
+                    on_time = self.pwm_period * (duty_cycle / 100.0)
+                    off_time = self.pwm_period - on_time
+                    
+                    if on_time > 0:
+                        pin_obj.off()  # LOW = ativo
+                        time.sleep_ms(int(on_time * 1000))
+                    if off_time > 0:
+                        pin_obj.on()   # HIGH = inativo
+                        time.sleep_ms(int(off_time * 1000))
+                else:
+                    pin_obj.on()  # Mantém HIGH quando duty cycle = 0
 
     def set_pwm_period(self, period):
         with self.pwm_lock:
@@ -146,10 +157,9 @@ class IO_MODBUS:
             return 1  # Retorna endereço padrão em modo simulado
 
         broadcast = 0xFF
-        id_loc = hex(broadcast)[2:]
-        id_loc = id_loc.zfill(2).upper()
+        id_loc = "{:02x}".format(broadcast).upper()
 
-        hex_text = f"{id_loc}0300020001"
+        hex_text = "{}0300020001".format(id_loc)
         bytes_hex = bytes.fromhex(hex_text)
         crc_result = self.crc16_modbus(bytes_hex)
 
@@ -200,14 +210,14 @@ class IO_MODBUS:
         if self.fake_modbus:
             return True  # Simula sucesso em modo simulado
 
-        adr_target = hex(adr)[2:].zfill(4).upper()
+        adr_target = "{:04x}".format(adr).upper()
         adr_device = self._get_adr_PTA()
 
         if adr_device == -1:
             return False
 
-        id_device = hex(adr_device)[2:].zfill(2).upper()
-        hex_text = f"{id_device}060002{adr_target}"
+        id_device = "{:02x}".format(adr_device).upper()
+        hex_text = "{}060002{}".format(id_device, adr_target)
         bytes_hex = bytes.fromhex(hex_text)
         crc_result = self.crc16_modbus(bytes_hex)
 
@@ -247,8 +257,9 @@ class IO_MODBUS:
             import urandom
             return 20.0 + urandom.randint(0, 100)  # Temperatura simulada entre 20-120°C
 
-        id_device = hex(adr)[2:].zfill(2).upper()
-        hex_text = f"{id_device}0300000001"
+        # Converte endereço para hex de forma compatível com MicroPython
+        id_device = "{:02x}".format(adr).upper()
+        hex_text = "{}0300000001".format(id_device)
         bytes_hex = bytes.fromhex(hex_text)
         crc_result = self.crc16_modbus(bytes_hex)
 
