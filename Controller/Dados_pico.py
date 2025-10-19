@@ -13,7 +13,7 @@ class Dado:
     def telas(self):
         return self._telas
     
-    def set_telas(self,tela):
+    def set_telas(self, tela):
         self.print_status_tela(tela)
         self._telas = tela
 
@@ -24,5 +24,5 @@ class Dado:
             print(f"Está na tela: EXECUCAO")
         elif tela == self.TELA_CONFIGURACAO:
             print(f"Está na tela: CONFIGURACAO")
-
-            
+        else:
+            print(f"Está na tela: PERSONALIZADA ({tela})")
